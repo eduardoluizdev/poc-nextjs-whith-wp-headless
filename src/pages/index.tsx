@@ -3,6 +3,8 @@ import Head from 'next/head'
 import { gql, useQuery } from '@apollo/client'
 import withApollo from 'shared/libs/withApollo'
 import { getDataFromTree } from '@apollo/client/react/ssr'
+import { useEffect, useState } from 'react'
+import { getMediumData } from 'services/medium'
 
 const GET_GENERAL_SITE_OPTIONS = gql`
   query SiteGeneralOptions {
@@ -20,7 +22,7 @@ const GET_GENERAL_SITE_OPTIONS = gql`
           }
         }
       }
-    }
+    }    
   }
 `
 
@@ -57,10 +59,10 @@ const GET_GENERAL_SITE_OPTIONS = gql`
 
     return {
       logo: {
-        altText: data.myOptionsPage.siteGeneralOptions.logo.altText,
-        sourceUrl: data.myOptionsPage.siteGeneralOptions.logo.sourceUrl,
+        altText: data?.myOptionsPage.siteGeneralOptions.logo.altText,
+        sourceUrl: data?.myOptionsPage.siteGeneralOptions.logo.sourceUrl,
       },
-      socialLinks : data.myOptionsPage.siteGeneralOptions.socialLinks.map((socialLink: any) => {
+      socialLinks : data?.myOptionsPage.siteGeneralOptions.socialLinks.map((socialLink: any) => {
         return {
           title: socialLink.socialLink.title,
           url: socialLink.socialLink.url,
@@ -70,12 +72,30 @@ const GET_GENERAL_SITE_OPTIONS = gql`
     } 
   }
 
+function getImages(string:string) {
+  const imgRex = /<img.*?src="(.*?)"[^>]+>/g;
+  const images = [];
+    let img;
+    while ((img = imgRex.exec(string))) {
+        images.push(img[1]);
+    }
+  return images;
+}
+  
+
 
 const Home = () => {
   const { data, loading } = useQuery(GET_GENERAL_SITE_OPTIONS);
+  const [medium, setMedium] = useState([])
   const content = pageContent(data)
-  
 
+  useEffect(() => {
+    const mediumData = async () => {
+      const mediumData:any = await getMediumData()      
+      setMedium(mediumData.data)
+    }
+    mediumData()
+  }, [])
 
   if (!data && loading) {
     return <h1>Loading...</h1>
@@ -91,7 +111,29 @@ const Home = () => {
 
       <h1>Poc NextJS with Headless WP</h1>
 
-      <img src={content?.logo.sourceUrl} alt={content?.logo.altText} />
+      <img src={content?.logo.sourceUrl} width="100" alt={content?.logo.altText} />
+
+      <hr />
+
+      <ul>
+        <li>LISTA DE POSTS MEDIUM</li>
+        {medium.map((item: any) => {
+          const paragraph:string = item['content:encoded'][0]
+          const getImageInParagraph = getImages(paragraph)
+          console.log()
+
+          return (
+            <li key={item.title}>
+              <p><img src={getImageInParagraph[0]} width="150" alt="" /></p>
+              <a href={item.link} target="_blank" rel="noreferrer">
+                {item.title}                
+              </a>
+            </li>
+          )
+        })}
+      </ul>
+
+      <hr />
 
       <ul>
         {content?.socialLinks.map((socialLink:any, index: any) => (
@@ -128,6 +170,20 @@ const Home = () => {
 //       data: pageContent
 //     }
 //  };
+// }
+
+// Home.getInitialProps = async (ctx: NextPageContext) => {
+//   const mediumArticles = getMediumArticles({
+//     auth: process.env.NEXT_PUBLIC_MEDIUM_TOKEN
+//   })
+
+//   const mediumContent = await mediumArticles
+
+//   console.log(mediumContent)
+
+//   return {
+//     mediumContent
+//   }
 // }
 
 export default withApollo(Home, { getDataFromTree })
